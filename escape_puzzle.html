@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>CIPHER — Escape Interface</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap');
+:root {
+  --bg:#080810; --surface:#0d0d1a; --panel:#111120; --border:#1a1a35;
+  --accent:#d63a32; --dim:#1a1a2e; --text:#c0c0e0; --text-dim:#44446a;
+  --green:#1fd65f; --amber:#ffaa00;
+  --c0:rgba(214,58,50,0.85);
+  --c1:rgba(80,160,255,0.85);
+  --c2:rgba(255,180,0,0.85);
+  --c3:rgba(80,220,130,0.85);
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:'Share Tech Mono',monospace;min-height:100vh;display:flex;flex-direction:column;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.07) 2px,rgba(0,0,0,0.07) 4px);pointer-events:none;z-index:999;}
+
+/* TOP BAR */
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:10px 24px;border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0;}
+.topbar-title{font-family:'Orbitron',sans-serif;font-size:18px;font-weight:900;letter-spacing:6px;color:var(--accent);}
+#ws-status{font-size:11px;color:var(--text-dim);letter-spacing:2px;display:flex;align-items:center;gap:8px;}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--text-dim);}
+.dot.on{background:var(--green);}
+.mode-badge{font-size:11px;letter-spacing:3px;padding:4px 12px;border:1px solid var(--accent);color:var(--accent);border-radius:2px;transition:all .3s;}
+.mode-badge.code{border-color:var(--amber);color:var(--amber);}
+
+/* MAIN */
+.main{flex:1;display:flex;flex-direction:column;align-items:center;gap:28px;padding:24px 24px 32px;}
+.hint{font-size:11px;letter-spacing:3px;color:var(--text-dim);text-align:center;}
+
+/* CARD STAGE */
+.stage{display:flex;gap:16px;align-items:flex-start;justify-content:center;flex-wrap:wrap;}
+.card-wrap{display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer;}
+.clabel{font-size:10px;letter-spacing:2px;color:var(--text-dim);transition:color .2s;}
+.card-wrap.sel .clabel{color:var(--accent);}
+
+/* Each card is a fixed frame; the SVG inside rotates */
+.card{
+  width:192px; height:192px;
+  background:var(--panel);
+  border:1px solid var(--border);
+  border-radius:4px;
+  position:relative;
+  display:flex;align-items:center;justify-content:center;
+  overflow:hidden;
+  transition:border-color .2s,box-shadow .2s;
+}
+.card.sel{border-color:var(--accent);box-shadow:0 0 20px rgba(214,58,50,.2);}
+.card.good{border-color:var(--green);box-shadow:0 0 16px rgba(31,214,95,.18);}
+.rot-ind{position:absolute;top:5px;right:7px;font-size:9px;color:var(--text-dim);z-index:2;}
+.card.sel .rot-ind{color:var(--accent);}
+
+/* The inner SVG group that actually rotates — around card center */
+.card-inner{
+  width:192px; height:192px;
+  position:relative;
+  transform-origin:center center;
+  transition:transform 0.5s cubic-bezier(.4,2,.6,1);
+}
+
+/* DIGIT DISPLAY inside card: 4 digit slots side by side */
+.card-svg{width:192px;height:192px;display:block;}
+
+/* DIVIDER */
+.section-divider{width:100%;max-width:860px;border:none;border-top:1px solid var(--border);margin:4px 0;}
+
+/* STACK VISUALIZER */
+.stack-section{display:flex;flex-direction:column;align-items:center;gap:10px;width:100%;}
+.stack-label{font-size:10px;letter-spacing:4px;color:var(--text-dim);}
+.stack-frame{
+  width:192px;height:192px;
+  background:var(--panel);
+  border:1px solid var(--border);
+  border-radius:4px;
+  position:relative;
+  overflow:hidden;
+}
+/* each card layer overlaid */
+.stack-layer{position:absolute;inset:0;width:192px;height:192px;}
+
+/* CODE ENTRY */
+.code-panel{display:flex;flex-direction:column;align-items:center;gap:14px;}
+.cdisp{display:flex;gap:8px;}
+.cd{width:48px;height:58px;background:var(--panel);border:1px solid var(--border);border-radius:2px;display:flex;align-items:center;justify-content:center;font-family:'Orbitron',sans-serif;font-size:26px;font-weight:700;color:var(--text-dim);transition:all .2s;}
+.cd.f{color:var(--amber);border-color:var(--amber);}
+.cd.c{color:var(--green);border-color:var(--green);}
+.cd.w{color:var(--accent);border-color:var(--accent);animation:shk .4s;}
+@keyframes shk{0%,100%{transform:translateX(0)}25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
+.keypad{display:grid;grid-template-columns:repeat(4,48px);gap:8px;}
+.kbtn{width:48px;height:38px;background:var(--panel);border:1px solid var(--border);color:var(--text);font-family:'Share Tech Mono',monospace;font-size:15px;border-radius:2px;cursor:pointer;transition:background .15s,transform .1s;}
+.kbtn:hover{background:var(--dim);}
+.kbtn:active{transform:scale(.93);}
+.kbtn.ent{grid-column:span 2;width:100%;font-size:11px;letter-spacing:2px;border-color:var(--amber);color:var(--amber);}
+.kbtn.clr{border-color:var(--text-dim);color:var(--text-dim);}
+
+/* STATUS BAR */
+.statusbar{display:flex;align-items:center;gap:16px;padding:8px 24px;border-top:1px solid var(--border);background:var(--surface);flex-shrink:0;font-size:11px;color:var(--text-dim);letter-spacing:2px;}
+#smsg{flex:1;}
+
+/* OVERLAYS */
+.overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(8,8,16,.9);z-index:100;opacity:0;pointer-events:none;transition:opacity .4s;}
+.overlay.show{opacity:1;pointer-events:all;}
+.obox{text-align:center;border:1px solid var(--border);padding:48px 64px;background:var(--panel);border-radius:4px;}
+.otitle{font-family:'Orbitron',sans-serif;font-size:28px;font-weight:900;letter-spacing:8px;margin-bottom:10px;}
+.otitle.ok{color:var(--green);}
+.otitle.bad{color:var(--accent);}
+.osub{font-size:12px;letter-spacing:3px;color:var(--text-dim);margin-bottom:26px;}
+.obtn{background:transparent;border:1px solid var(--text-dim);color:var(--text);font-family:'Share Tech Mono',monospace;font-size:12px;letter-spacing:3px;padding:10px 28px;cursor:pointer;border-radius:2px;}
+.obtn:hover{border-color:var(--text);color:#fff;}
+
+/* card color tints per card index */
+.tint0{opacity:0.88;}
+.tint1{opacity:0.88;}
+.tint2{opacity:0.88;}
+.tint3{opacity:0.88;}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-title">CIPHER</div>
+  <div id="ws-status"><span class="dot" id="dot"></span>DISCONNECTED</div>
+  <div class="mode-badge" id="mbadge">PUZZLE MODE</div>
+</div>
+
+<div class="main">
+  <div class="hint" id="hint">SELECT A CARD — ROTATE TO ALIGN ITS SEGMENTS WITH THE OTHERS</div>
+
+  <!-- 4 CARDS -->
+  <div class="stage" id="stage"></div>
+
+  <hr class="section-divider">
+
+  <!-- STACK VISUALIZER -->
+  <div class="stack-section">
+    <div class="stack-label">STACKED PREVIEW — ALL 4 CARDS OVERLAID</div>
+    <div class="stack-frame" id="stack-frame"></div>
+    <div class="hint" id="stack-hint" style="color:var(--text-dim)">ROTATE ALL CARDS CORRECTLY TO REVEAL THE CODE</div>
+  </div>
+
+  <hr class="section-divider">
+
+  <!-- CODE ENTRY -->
+  <div class="code-panel" id="cpanel" style="display:none">
+    <div class="hint">ENTER THE 4-DIGIT CODE YOU DISCOVERED</div>
+    <div class="cdisp">
+      <div class="cd" id="d0">_</div><div class="cd" id="d1">_</div>
+      <div class="cd" id="d2">_</div><div class="cd" id="d3">_</div>
+    </div>
+    <div class="keypad">
+      <button class="kbtn" onclick="pk('1')">1</button>
+      <button class="kbtn" onclick="pk('2')">2</button>
+      <button class="kbtn" onclick="pk('3')">3</button>
+      <button class="kbtn" onclick="pk('4')">4</button>
+      <button class="kbtn" onclick="pk('5')">5</button>
+      <button class="kbtn" onclick="pk('6')">6</button>
+      <button class="kbtn" onclick="pk('7')">7</button>
+      <button class="kbtn" onclick="pk('8')">8</button>
+      <button class="kbtn" onclick="pk('9')">9</button>
+      <button class="kbtn" onclick="pk('0')">0</button>
+      <button class="kbtn clr" onclick="clrCode()">CLR</button>
+      <button class="kbtn clr" onclick="bk()">&#9003;</button>
+      <button class="kbtn ent" onclick="sub()">ENTER</button>
+    </div>
+  </div>
+</div>
+
+<div class="statusbar">
+  <div id="smsg">KEYBOARD: ARROWS / 1-4 = SELECT  R = ROTATE  ENTER = SWITCH MODE</div>
+  <div>WS :8765</div>
+</div>
+
+<div class="overlay" id="ov-ok">
+  <div class="obox">
+    <div class="otitle ok">ACCESS GRANTED</div>
+    <div class="osub">SYSTEM UNLOCKED — CODE ACCEPTED</div>
+    <button class="obtn" onclick="resetGame()">RESET SYSTEM</button>
+  </div>
+</div>
+<div class="overlay" id="ov-bad">
+  <div class="obox">
+    <div class="otitle bad">ACCESS DENIED</div>
+    <div class="osub">INCORRECT CODE — TRY AGAIN</div>
+    <button class="obtn" onclick="closeBad()">RETRY</button>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+//  CONFIG
+// ═══════════════════════════════════════════════════════
+const SECRET = '2431';
+
+// Starting rotation offsets per card (0=correct, 1-3=scrambled)
+const START_ROTS = [1, 2, 3, 1];
+
+// Colors per card (RGBA strings for SVG fill)
+const CARD_COLORS = [
+  'rgba(214, 58,  50,  0.9)',   // card 0: red
+  'rgba( 70,150, 255, 0.9)',   // card 1: blue
+  'rgba(255,170,  0,  0.9)',   // card 2: amber
+  'rgba( 50,210, 110, 0.9)',   // card 3: green
+];
+
+// ═══════════════════════════════════════════════════════
+//  7-SEGMENT DATA
+//  Segments per digit: [top, topL, topR, mid, botL, botR, bot]
+// ═══════════════════════════════════════════════════════
+const SEG_BITS = {
+  '0':[1,1,1,0,1,1,1], '1':[0,0,1,0,0,1,0], '2':[1,0,1,1,1,0,1],
+  '3':[1,0,1,1,0,1,1], '4':[0,1,1,1,0,1,0], '5':[1,1,0,1,0,1,1],
+  '6':[1,1,0,1,1,1,1], '7':[1,0,1,0,0,1,0], '8':[1,1,1,1,1,1,1],
+  '9':[1,1,1,1,0,1,1]
+};
+
+// SVG path data for one 7-segment digit at given x-offset
+// Digit bounding box: 42w x 68h, gaps=2
+function segPaths(xOff, yOff=2) {
+  const x=xOff, y=yOff, w=42, h=68;
+  const s=5, t=5; // stroke thickness, tip
+  return [
+    // top
+    `M${x+t},${y} L${x+w-t},${y} L${x+w-t+2},${y+s} L${x+t-2},${y+s} Z`,
+    // top-left
+    `M${x},${y+t} L${x+s},${y+t+2} L${x+s},${y+h/2-t} L${x},${y+h/2} Z`,
+    // top-right
+    `M${x+w},${y+t} L${x+w},${y+h/2} L${x+w-s},${y+h/2-t} L${x+w-s},${y+t+2} Z`,
+    // middle
+    `M${x+t},${y+h/2-s/2} L${x+w-t},${y+h/2-s/2} L${x+w-t+2},${y+h/2} L${x+w-t},${y+h/2+s/2} L${x+t},${y+h/2+s/2} L${x+t-2},${y+h/2} Z`,
+    // bot-left
+    `M${x},${y+h/2} L${x+s},${y+h/2+t} L${x+s},${y+h-t} L${x},${y+h-t+2} Z`,
+    // bot-right
+    `M${x+w},${y+h/2} L${x+w},${y+h-t+2} L${x+w-s},${y+h-t} L${x+w-s},${y+h/2+t} Z`,
+    // bottom
+    `M${x+t},${y+h-s} L${x+w-t},${y+h-s} L${x+w-t+2},${y+h} L${x+t-2},${y+h} Z`,
+  ];
+}
+
+// ═══════════════════════════════════════════════════════
+//  PUZZLE GENERATION
+//  Randomly split the 7 segments of each digit across 4 cards
+// ═══════════════════════════════════════════════════════
+// assignment[digitIdx][segIdx] = cardIdx (0-3)
+let segAssignment = [];
+
+function generatePuzzle() {
+  segAssignment = [];
+  for (let d = 0; d < 4; d++) {
+    const bits = SEG_BITS[SECRET[d]];
+    const onSegs = bits.map((b,i)=>b?i:-1).filter(i=>i>=0);
+    // shuffle card assignments for "on" segments
+    const assigns = new Array(7).fill(-1); // -1 = segment is off (no card owns it)
+    // distribute on-segments randomly across 4 cards, ensure each card gets some
+    const shuffled = [...onSegs].sort(()=>Math.random()-0.5);
+    shuffled.forEach((segIdx, i) => {
+      assigns[segIdx] = i % 4; // round-robin with shuffle = random but balanced
+    });
+    segAssignment.push(assigns);
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════════
+let cardRots = [...START_ROTS];
+let selectedCard = 0;
+let mode = 'puzzle';
+let codeInput = '';
+let allSolved = false;
+let ws = null;
+
+// ═══════════════════════════════════════════════════════
+//  SVG BUILDER
+//  Build one card's SVG: shows its assigned segments across all 4 digits
+//  rotationSteps: 0=0°, 1=90°, 2=180°, 3=270°
+// ═══════════════════════════════════════════════════════
+
+// Card SVG dimensions: square, 4 digits centered inside
+// digit: 42w x 68h — 4 digits + 3 gaps of 6 = 186w total, centered in 192
+// vertical center: (192 - 68) / 2 = 62
+const DIG_W = 42, DIG_GAP = 6, DIG_Y = 62, SVG_W = 192, SVG_H = 192;
+
+function buildCardSVG(cardIdx, rotSteps, forStack=false) {
+  const color = CARD_COLORS[cardIdx];
+  const NS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('viewBox', `0 0 ${SVG_W} ${SVG_H}`);
+  svg.setAttribute('width', SVG_W);
+  svg.setAttribute('height', SVG_H);
+  svg.style.display = 'block';
+
+  // rotation transform around center
+  const cx = SVG_W/2, cy = SVG_H/2;
+  const deg = rotSteps * 90;
+  const g = document.createElementNS(NS, 'g');
+  g.setAttribute('transform', `rotate(${deg},${cx},${cy})`);
+
+  for (let d = 0; d < 4; d++) {
+    // 4 digits total width = 4*42 + 3*6 = 186, left margin = (192-186)/2 = 3
+    const xOff = 3 + d*(DIG_W + DIG_GAP);
+    const paths = segPaths(xOff, DIG_Y);
+    const bits = SEG_BITS[SECRET[d]];
+
+    for (let s = 0; s < 7; s++) {
+      if (bits[s] && segAssignment[d][s] === cardIdx) {
+        const p = document.createElementNS(NS, 'path');
+        p.setAttribute('d', paths[s]);
+        p.setAttribute('fill', color);
+        p.setAttribute('stroke', 'none');
+        g.appendChild(p);
+      }
+    }
+  }
+
+  svg.appendChild(g);
+  return svg;
+}
+
+// ═══════════════════════════════════════════════════════
+//  RENDER STAGE
+// ═══════════════════════════════════════════════════════
+function renderStage() {
+  const stage = document.getElementById('stage');
+  stage.innerHTML = '';
+
+  for (let i = 0; i < 4; i++) {
+    const wrap = document.createElement('div');
+    wrap.className = 'card-wrap' + (i===selectedCard?' sel':'');
+    wrap.onclick = () => selCard(i);
+
+    const lbl = document.createElement('div');
+    lbl.className = 'clabel';
+    lbl.textContent = `CARD ${i+1}`;
+
+    const card = document.createElement('div');
+    card.className = 'card' + (i===selectedCard?' sel':'') + (cardRots[i]===0?' good':'');
+    card.id = `c${i}`;
+
+    const ri = document.createElement('div');
+    ri.className = 'rot-ind';
+    ri.textContent = `${cardRots[i]*90}°`;
+
+    const svg = buildCardSVG(i, cardRots[i]);
+    card.appendChild(ri);
+    card.appendChild(svg);
+    wrap.appendChild(lbl);
+    wrap.appendChild(card);
+    stage.appendChild(wrap);
+  }
+
+  renderStack();
+}
+
+// ═══════════════════════════════════════════════════════
+//  STACK VISUALIZER
+// ═══════════════════════════════════════════════════════
+function renderStack() {
+  const frame = document.getElementById('stack-frame');
+  frame.innerHTML = '';
+
+  for (let i = 0; i < 4; i++) {
+    const layer = document.createElement('div');
+    layer.className = 'stack-layer';
+    layer.style.position = 'absolute';
+    layer.style.inset = '0';
+    const svg = buildCardSVG(i, cardRots[i], true);
+    layer.appendChild(svg);
+    frame.appendChild(layer);
+  }
+
+  const solved = cardRots.every(r => r === 0);
+  const hint = document.getElementById('stack-hint');
+  if (solved) {
+    hint.textContent = 'CODE REVEALED — SWITCH TO CODE MODE AND ENTER IT';
+    hint.style.color = 'var(--green)';
+  } else {
+    const count = cardRots.filter(r=>r===0).length;
+    hint.textContent = `${count}/4 CARDS ALIGNED`;
+    hint.style.color = 'var(--text-dim)';
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  CONTROLS
+// ═══════════════════════════════════════════════════════
+function selCard(i) {
+  console.trace(`selCard(${i}) called`);
+  if (mode !== 'puzzle') return;
+  selectedCard = i;
+  st(`CARD ${i+1} SELECTED`);
+  renderStage();
+}
+function selNext() { selCard((selectedCard+1)%4); }
+function selPrev() { selCard((selectedCard+3)%4); }
+
+// function rotate() {
+//   console.log('rotate called, selectedCard before:', selectedCard);
+//   if (mode !== 'puzzle') return;
+//   cardRots[selectedCard] = (cardRots[selectedCard]+1) % 4;
+//   if (!allSolved && cardRots.every(r=>r===0)) {
+//     allSolved = true;
+//     st('ALL CARDS ALIGNED — CODE REVEALED — PRESS ENTER TO SWITCH TO CODE MODE');
+//   }
+//   renderStage();
+//   console.log('rotate done, selectedCard after:', selectedCard);
+// }
+function rotate() {
+  if (mode !== 'puzzle') return;
+  if (allSolved) return;
+
+  cardRots[selectedCard] = (cardRots[selectedCard]+1) % 4;
+  
+  // if this card is now aligned, advance to next card
+  if (cardRots[selectedCard] === 0) {
+    selectedCard = (selectedCard + 1) % 4;
+  }
+  
+  if (!allSolved && cardRots.every(r=>r===0)) {
+    allSolved = true;
+    st('ALL CARDS ALIGNED — CODE REVEALED — PRESS ENTER TO SWITCH TO CODE MODE');
+  }
+  renderStage();
+}
+
+function switchMode() {
+  if (mode === 'puzzle') {
+    mode = 'code';
+    document.getElementById('mbadge').textContent = 'CODE MODE';
+    document.getElementById('mbadge').classList.add('code');
+    document.getElementById('cpanel').style.display = 'flex';
+    document.getElementById('hint').style.display = 'none';
+    document.getElementById('stage').style.opacity = '.3';
+    st('CODE ENTRY — TYPE THE 4-DIGIT CODE');
+  } else {
+    mode = 'puzzle';
+    document.getElementById('mbadge').textContent = 'PUZZLE MODE';
+    document.getElementById('mbadge').classList.remove('code');
+    document.getElementById('cpanel').style.display = 'none';
+    document.getElementById('hint').style.display = '';
+    document.getElementById('stage').style.opacity = '1';
+    st('PUZZLE MODE');
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  CODE ENTRY
+// ═══════════════════════════════════════════════════════
+function pk(k) { if(codeInput.length>=4)return; codeInput+=k; updDisp(); }
+function clrCode() { codeInput=''; updDisp(); }
+function bk() { codeInput=codeInput.slice(0,-1); updDisp(); }
+function updDisp(state) {
+  for(let i=0;i<4;i++){
+    const el=document.getElementById(`d${i}`);
+    el.textContent=codeInput[i]||'_'; el.className='cd';
+    if(state==='c') el.classList.add('c');
+    else if(state==='w') el.classList.add('w');
+    else if(codeInput[i]) el.classList.add('f');
+  }
+}
+function sub() {
+  if(codeInput.length<4){st('ENTER ALL 4 DIGITS');return;}
+  if(codeInput===SECRET){
+    updDisp('c');
+    setTimeout(()=>document.getElementById('ov-ok').classList.add('show'),600);
+  } else {
+    updDisp('w'); st('INCORRECT — TRY AGAIN');
+    setTimeout(()=>document.getElementById('ov-bad').classList.add('show'),500);
+  }
+}
+function closeBad(){document.getElementById('ov-bad').classList.remove('show');codeInput='';updDisp();}
+function resetGame(){
+  document.getElementById('ov-ok').classList.remove('show');
+  codeInput=''; allSolved=false; selectedCard=0;
+  cardRots=[...START_ROTS]; mode='puzzle';
+  document.getElementById('mbadge').textContent='PUZZLE MODE';
+  document.getElementById('mbadge').classList.remove('code');
+  document.getElementById('cpanel').style.display='none';
+  document.getElementById('hint').style.display='';
+  document.getElementById('stage').style.opacity='1';
+  generatePuzzle();
+  renderStage();
+  st('SYSTEM RESET');
+}
+
+// ═══════════════════════════════════════════════════════
+//  COMMAND ROUTER
+// ═══════════════════════════════════════════════════════
+function cmd(s) {
+  s = s.trim().toUpperCase();
+  if(s==='ESC') { if(mode==='code') switchMode(); return; }
+  if(s==='SEL'||s==='SELECT'){selNext();return;}
+  if(s==='ROT'||s==='ROTATE'){rotate();return;}
+  if(s==='ENT'||s==='ENTER'){mode==='puzzle'?switchMode():sub();return;}
+  if(s==='BACK'){bk();return;}
+  if(s==='CLEAR'){clrCode();return;}
+  if(s==='CARD:1')selCard(0); if(s==='CARD:2')selCard(1);
+  if(s==='CARD:3')selCard(2); if(s==='CARD:4')selCard(3);
+  if(mode==='code'&&'0123456789'.includes(s)&&s.length===1)pk(s);
+}
+
+// KEYBOARD
+document.addEventListener('keydown',e=>{
+  if(['ArrowRight','Tab'].includes(e.key)){e.preventDefault();selNext();}
+  if(e.key==='ArrowLeft'){e.preventDefault();selPrev();}
+  if(e.key==='r'||e.key==='R') rotate();
+  if(e.key==='Enter') mode==='puzzle'?switchMode():sub();
+  if(e.key==='Escape'&&mode==='code') switchMode();
+  if(mode==='code'){
+    if('0123456789'.includes(e.key)) pk(e.key);
+    if(e.key==='Backspace') bk();
+    if(e.key==='Delete') clrCode();
+  }
+  if(mode==='puzzle'&&'1234'.includes(e.key)) selCard(parseInt(e.key)-1);
+});
+
+// WEBSOCKET
+function connectWS(){
+  try{
+    ws=new WebSocket('ws://127.0.0.1:8766');
+    ws.onopen=()=>{
+      document.getElementById('dot').classList.add('on');
+      document.getElementById('ws-status').innerHTML='<span class="dot on" id="dot"></span>CONNECTED';
+      st('ESP32 CONNECTED');
+    };
+    ws.onclose=()=>{
+      document.getElementById('dot').classList.remove('on');
+      document.getElementById('ws-status').innerHTML='<span class="dot" id="dot"></span>DISCONNECTED';
+      setTimeout(connectWS,3000);
+    };
+    ws.onerror=()=>{};
+    ws.onmessage=e=>cmd(e.data);
+  }catch(e){}
+}
+
+function st(m){document.getElementById('smsg').textContent=m;}
+
+// INIT
+generatePuzzle();
+renderStage();
+connectWS();
+</script>
+</body>
+</html>
