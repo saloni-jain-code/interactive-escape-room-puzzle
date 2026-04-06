@@ -1,7 +1,13 @@
 # CIPHER
  
 An escape room puzzle installation built with an ESP32, copper tape capacitive touch pads, and a browser-based interface. Players rotate four overlaid card segments to reveal a hidden 4-digit code, then enter it using the touch pads.
- 
+
+![full_setup](https://github.com/user-attachments/assets/8f4d1242-ad87-40aa-ba9f-84199716603b)
+<img width="889" height="638" alt="step1" src="https://github.com/user-attachments/assets/025bc6af-244b-4451-a822-988ec249eadd" />
+<img width="888" height="647" alt="step2" src="https://github.com/user-attachments/assets/3a9a3beb-7b09-4afc-9768-1f805ac8e590" />
+<img width="880" height="930" alt="step3" src="https://github.com/user-attachments/assets/348e8ae6-b06f-4863-b49f-690843b393ed" />
+<img width="887" height="949" alt="step4" src="https://github.com/user-attachments/assets/ff1eefc1-ebac-4cc2-b090-cbb7348d2831" />
+
 ---
  
 ## How It Works
